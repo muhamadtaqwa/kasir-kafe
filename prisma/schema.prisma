@@ -1,0 +1,168 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  KASIR
+  DAPUR
+}
+
+enum OrderSource {
+  QR
+  KASIR
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  DIMASAK
+  SELESAI
+  CANCEL
+}
+
+enum PaymentMethod {
+  QRIS
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  isActive  Boolean  @default(true)
+  orders    Order[]  @relation("KasirOrders")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String
+  icon      String?
+  isActive  Boolean   @default(true)
+  products  Product[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("categories")
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  categoryId  String      @map("category_id")
+  name        String
+  description String?
+  price       Int
+  image       String?
+  isAvailable Boolean     @default(true) @map("is_available")
+  category    Category    @relation(fields: [categoryId], references: [id])
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@map("products")
+}
+
+model Table {
+  id        String   @id @default(uuid())
+  name      String
+  qrCode    String   @unique @map("qr_code")
+  isActive  Boolean  @default(true) @map("is_active")
+  orders    Order[]
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("tables")
+}
+
+model Order {
+  id           String      @id @default(uuid())
+  orderNumber  String      @unique @map("order_number")
+  tableId      String?     @map("table_id")
+  customerName String?     @map("customer_name")
+  orderSource  OrderSource @map("order_source")
+  orderType    OrderType   @map("order_type")
+  status       OrderStatus @default(PENDING)
+  subtotal     Int
+  discount     Int         @default(0)
+  tax          Int         @default(0)
+  total        Int
+  createdBy    String?     @map("created_by")
+  table        Table?      @relation(fields: [tableId], references: [id])
+  kasir        User?       @relation("KasirOrders", fields: [createdBy], references: [id])
+  items        OrderItem[]
+  payment      Payment?
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  productId String   @map("product_id")
+  qty       Int
+  price     Int
+  notes     String?
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("order_items")
+}
+
+model Payment {
+  id                    String        @id @default(uuid())
+  orderId               String        @unique @map("order_id")
+  method                PaymentMethod
+  status                PaymentStatus @default(PENDING)
+  amount                Int
+  midtransTransactionId String?       @map("midtrans_transaction_id")
+  midtransPaymentType   String?       @map("midtrans_payment_type")
+  midtransQrUrl         String?       @map("midtrans_qr_url")
+  midtransQrString      String?       @map("midtrans_qr_string")
+  paidAt                DateTime?     @map("paid_at")
+  order                 Order         @relation(fields: [orderId], references: [id])
+  createdAt             DateTime      @default(now()) @map("created_at")
+  paidAmount            Int?          @map("paid_amount")
+  changeAmount          Int?          @map("change_amount")
+
+  @@map("payments")
+}
+
+model Discount {
+  id          String    @id @default(uuid())
+  code        String    @unique
+  type        String
+  value       Int
+  minOrder    Int       @default(0) @map("min_order")
+  maxDiscount Int?      @map("max_discount")
+  isActive    Boolean   @default(true) @map("is_active")
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@map("discounts")
+}
